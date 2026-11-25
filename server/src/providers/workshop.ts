@@ -7,9 +7,11 @@
  *   1. Contratar el acceso API y rellenar las variables en server/.env
  *   2. Implementar `fetch()` del proveedor (mapear su respuesta a specs/documents)
  *
+ * (Autodata/Alldata descartados: sus esquemas eléctricos no sirven. Los esquemas
+ *  salen de los portales oficiales por VIN, ver providers/wiring.ts.)
+ *
  * Proveedores habituales en Europa:
  *   - HaynesPro WorkshopData  → esquemas eléctricos, procedimientos, mantenimiento (identifica por VIN o TecDoc K-Type)
- *   - Autodata                → esquemas, distribución, pares, códigos de avería
  *   - TecDoc (TecAlliance)    → catálogo de recambios y vínculos por K-Type / VIN
  *   - Portales RMI de cada fabricante (Reglamento UE 2018/858) → información oficial, acceso por suscripción
  */
@@ -51,15 +53,6 @@ export const workshopProviders: WorkshopProvider[] = [
       // TODO: autenticar (distributor + password → token), identificar vehículo por VIN o K-Type
       // y mapear: esquemas eléctricos → documents(kind 'esquema_electrico'), mantenimiento → specs…
       throw new NotImplementedError('HaynesPro');
-    },
-  },
-  {
-    id: 'autodata',
-    label: 'Autodata',
-    description: 'Esquemas eléctricos, correas de distribución, pares de apriete, códigos de avería',
-    configured: () => !!(env('AUTODATA_CLIENT_ID') && env('AUTODATA_CLIENT_SECRET')),
-    async fetch() {
-      throw new NotImplementedError('Autodata');
     },
   },
   {

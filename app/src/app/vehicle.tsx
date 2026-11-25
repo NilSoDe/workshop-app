@@ -1,6 +1,6 @@
 import type { DocumentKind, SourceStatus, SpecSection, VehicleDocument, VehicleReport } from '@workshop/core';
 import * as Clipboard from 'expo-clipboard';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
@@ -12,7 +12,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { api, ApiError } from '@/lib/api';
 import { addToHistory } from '@/lib/storage';
 
-type Tab = 'ficha' | 'docs' | 'revisiones' | 'fuentes';
+type Tab = 'ficha' | 'esquemas' | 'docs' | 'revisiones' | 'fuentes';
 
 const KIND_LABEL: Record<DocumentKind, string> = {
   esquema_electrico: 'Esquemas eléctricos',
@@ -25,7 +25,6 @@ const KIND_LABEL: Record<DocumentKind, string> = {
   otro: 'Otros',
 };
 const KIND_ORDER: DocumentKind[] = [
-  'esquema_electrico',
   'manual_taller',
   'mantenimiento',
   'boletin_tecnico',
@@ -133,7 +132,7 @@ export default function VehicleScreen() {
           )}
         </View>
         <View style={styles.chips}>
-          {[s.fuel, s.engine, s.body, s.engineCode && `Motor ${s.engineCode}`, s.ktype && `K-Type ${s.ktype}`]
+          {[s.platform && `Plataforma ${s.platform}`, s.fuel, s.engine, s.body, s.engineCode && `Motor ${s.engineCode}`, s.ktype && `K-Type ${s.ktype}`]
             .filter((x): x is string => !!x)
             .map((c) => (
               <Badge key={c} label={c} />
@@ -151,8 +150,9 @@ export default function VehicleScreen() {
         {(
           [
             ['ficha', 'Ficha'],
+            ['esquemas', 'Esquemas'],
             ['docs', 'Docs'],
-            ['revisiones', `Revisiones${report.recalls.length ? ` (${report.recalls.length})` : ''}`],
+            ['revisiones', `Recalls${report.recalls.length ? ` (${report.recalls.length})` : ''}`],
             ['fuentes', 'Fuentes'],
           ] as [Tab, string][]
         ).map(([id, label]) => (
@@ -169,7 +169,9 @@ export default function VehicleScreen() {
 
       {tab === 'ficha' && (report.specs.length ? report.specs.map((sec) => <SpecCard key={sec.id} section={sec} />) : <Notice text="Sin especificaciones disponibles." />)}
 
-      {tab === 'docs' && <DocumentsTab docs={report.documents} sources={report.sources} />}
+      {tab === 'esquemas' && <WiringTab report={report} />}
+
+      {tab === 'docs' && <DocumentsTab docs={report.documents.filter((d) => d.kind !== 'esquema_electrico')} />}
 
       {tab === 'revisiones' &&
         (report.recalls.length ? (
@@ -255,19 +257,74 @@ function SpecCard({ section }: { section: SpecSection }) {
   );
 }
 
-function DocumentsTab({ docs, sources }: { docs: VehicleDocument[]; sources: VehicleReport['sources'] }) {
-  const t = useTheme();
-  const licensed = sources.filter((s) => ['haynespro', 'autodata', 'tecdoc'].includes(s.provider));
-  const pending = licensed.filter((s) => s.status === 'not_configured');
+async function openDocument(d: VehicleDocument) {
+  if (d.copyValue) await Clipboard.setStringAsync(d.copyValue);
+  await WebBrowser.openBrowserAsync(d.url);
+}
+
+function DocCard({ d }: { d: VehicleDocument }) {
+  return (
+    <Pressable onPress={() => openDocument(d)} accessibilityRole="link">
+      <Card>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: Spacing.two }}>
+          <ThemedText type="smallBold" style={{ flex: 1 }}>
+            {d.title}
+          </ThemedText>
+          <Badge
+            label={d.trust === 'oficial' ? 'Oficial' : d.trust === 'licencia' ? 'Licencia' : 'Búsqueda'}
+            color={d.trust === 'busqueda' ? 'textSecondary' : 'success'}
+          />
+        </View>
+        {d.note && <ThemedText type="small" themeColor="textSecondary">{d.note}</ThemedText>}
+        {d.copyValue && (
+          <ThemedText type="small" themeColor="accent">
+            ⧉ Copia {d.copyValue} y abre
+          </ThemedText>
+        )}
+      </Card>
+    </Pressable>
+  );
+}
+
+function WiringTab({ report }: { report: VehicleReport }) {
+  const wiring = report.documents
+    .filter((d) => d.kind === 'esquema_electrico')
+    .sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99));
+  if (!report.query.vin) {
+    return (
+      <View style={{ gap: Spacing.three }}>
+        <Notice text="Los esquemas eléctricos se buscan con el VIN: así salen los de esa unidad exacta (motor, equipamiento, año). Escanea el bastidor para continuar." />
+        <Button title="Escanear VIN" onPress={() => router.push({ pathname: '/scan', params: { kind: 'vin' } })} />
+      </View>
+    );
+  }
+  const official = wiring.filter((d) => d.trust !== 'busqueda');
+  const searches = wiring.filter((d) => d.trust === 'busqueda');
   return (
     <View style={{ gap: Spacing.two }}>
-      {pending.length > 0 && (
-        <Notice
-          text={`Esquemas eléctricos y manuales oficiales completos requieren un proveedor con licencia (${pending
-            .map((p) => p.label)
-            .join(', ')}). Mientras tanto se muestran fuentes oficiales y búsquedas dirigidas.`}
-        />
+      {official.length > 0 && (
+        <>
+          <SectionTitle>Portal oficial del fabricante</SectionTitle>
+          {official.map((d) => (
+            <DocCard key={d.url} d={d} />
+          ))}
+        </>
       )}
+      {searches.length > 0 && (
+        <>
+          <SectionTitle>Búsquedas dirigidas</SectionTitle>
+          {searches.map((d) => (
+            <DocCard key={d.url} d={d} />
+          ))}
+        </>
+      )}
+    </View>
+  );
+}
+
+function DocumentsTab({ docs }: { docs: VehicleDocument[] }) {
+  return (
+    <View style={{ gap: Spacing.two }}>
       {KIND_ORDER.filter((k) => docs.some((d) => d.kind === k)).map((kind) => (
         <View key={kind}>
           <SectionTitle>{KIND_LABEL[kind]}</SectionTitle>
@@ -275,20 +332,7 @@ function DocumentsTab({ docs, sources }: { docs: VehicleDocument[]; sources: Veh
             {docs
               .filter((d) => d.kind === kind)
               .map((d) => (
-                <Pressable key={d.url} onPress={() => WebBrowser.openBrowserAsync(d.url)}>
-                  <Card>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: Spacing.two }}>
-                      <ThemedText type="smallBold" style={{ flex: 1, color: t.text }}>
-                        {d.title}
-                      </ThemedText>
-                      <Badge
-                        label={d.trust === 'oficial' ? 'Oficial' : d.trust === 'licencia' ? 'Licencia' : 'Búsqueda'}
-                        color={d.trust === 'busqueda' ? 'textSecondary' : 'success'}
-                      />
-                    </View>
-                    {d.note && <ThemedText type="small" themeColor="textSecondary">{d.note}</ThemedText>}
-                  </Card>
-                </Pressable>
+                <DocCard key={d.url} d={d} />
               ))}
           </View>
         </View>

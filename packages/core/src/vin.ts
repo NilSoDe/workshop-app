@@ -201,6 +201,44 @@ export function modelYearCandidates(vin: string, now = new Date()): number[] {
   return [b, a].filter((y) => y <= max);
 }
 
+/** Códigos de plataforma VAG (posiciones 7-8 del VIN) más comunes en España. */
+const VAG_PLATFORMS: Record<string, string> = {
+  '1K': 'Golf V / Jetta', '5K': 'Golf VI', AU: 'Golf VII', CD: 'Golf VIII',
+  '6R': 'Polo V', AW: 'Polo VI', '1T': 'Touran I', '3C': 'Passat B6/B7', '3G': 'Passat B8',
+  '5N': 'Tiguan I', AD: 'Tiguan II', '2K': 'Caddy',
+  '1P': 'León II', '5F': 'León III', KL: 'León IV', '6J': 'Ibiza IV', KJ: 'Ibiza V',
+  '8P': 'A3 (8P)', '8V': 'A3 (8V)',
+  '5E': 'Octavia III', NX: 'Octavia IV', '3T': 'Superb II', '3V': 'Superb III',
+};
+
+const VAG_WMI = /^(WVW|WV1|WV2|WAU|TRU|WUA|VSS|TMB)$/;
+const MERCEDES_WMI = /^(WDB|WDD|WDC|WDF|W1K|W1N|W1V)$/;
+
+export interface PlatformCode {
+  /** p. ej. "5F" (VAG) o "205" (Mercedes) */
+  code: string;
+  /** Texto de búsqueda que usan los manuales: "5F", "W205" */
+  searchTerm: string;
+  label?: string;
+  scheme: 'VAG' | 'Mercedes-Benz';
+}
+
+/** Código de plataforma/serie: lo que usan los manuales y esquemas del fabricante. */
+export function platformCodeFromVin(vin: string): PlatformCode | undefined {
+  const wmi = vin.slice(0, 3);
+  if (VAG_WMI.test(wmi)) {
+    const code = vin.slice(6, 8);
+    if (/^[A-Z0-9]{2}$/.test(code) && code !== 'ZZ') {
+      return { code, searchTerm: code, label: VAG_PLATFORMS[code], scheme: 'VAG' };
+    }
+  }
+  if (MERCEDES_WMI.test(wmi)) {
+    const code = vin.slice(3, 6);
+    if (/^\d{3}$/.test(code)) return { code, searchTerm: `W${code}`, scheme: 'Mercedes-Benz' };
+  }
+  return undefined;
+}
+
 export interface VinInfo {
   vin: string;
   valid: boolean;
@@ -216,6 +254,7 @@ export interface VinInfo {
   modelYearCandidates: number[];
   plantCode: string;
   serialNumber: string;
+  platform?: PlatformCode;
   warnings: string[];
 }
 
@@ -251,6 +290,7 @@ export function decodeVinLocal(input: string): VinInfo {
     modelYearCandidates: valid ? modelYearCandidates(vin) : [],
     plantCode: vin[10] ?? '',
     serialNumber: vin.slice(11, 17),
+    platform: valid ? platformCodeFromVin(vin) : undefined,
     warnings,
   };
 }

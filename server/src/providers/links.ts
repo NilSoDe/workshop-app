@@ -24,6 +24,18 @@ export function buildDocumentLinks(opts: {
     note: `Titularidad, cargas, ITV, kilometraje. De pago, con ${plate ? 'la matrícula' : 'matrícula o bastidor'}.`,
   });
 
+  docs.push({
+    title: 'Aceites y líquidos recomendados (Castrol)',
+    kind: 'mantenimiento',
+    url: 'https://www.castrol.com/es_es/spain/home/product-finder.html',
+    source: 'Castrol',
+    trust: 'oficial',
+    note: plate
+      ? 'Busca por matrícula: aceite, caja, frenos y refrigerante. La matrícula se copia al abrir.'
+      : 'Busca por matrícula o por marca y modelo: aceite, caja, frenos y refrigerante.',
+    copyValue: plate,
+  });
+
   if (northAmerican && vin) {
     docs.push({
       title: 'Llamadas a revisión por VIN (NHTSA)',
@@ -40,13 +52,6 @@ export function buildDocumentLinks(opts: {
   const withEngine = [withYear, summary.engineCode ?? summary.engine].filter(Boolean).join(' ');
 
   docs.push(
-    {
-      title: `Esquemas eléctricos — ${withYear}`,
-      kind: 'esquema_electrico',
-      url: google(`${withYear} esquema eléctrico wiring diagram pdf`),
-      source: 'Búsqueda web',
-      trust: 'busqueda',
-    },
     {
       title: `Manual de taller — ${withEngine}`,
       kind: 'manual_taller',

@@ -38,7 +38,29 @@ npm run typecheck # core + server + app
 2. **Escanear VIN** → OCR → extracción y validación del VIN (ISO 3779) → ficha.
 3. **A mano** → detecta si es VIN o matrícula.
 
-La ficha tiene 4 pestañas: **Ficha** (especificaciones por sección), **Docs** (esquemas eléctricos, manuales de taller, mantenimiento, boletines, manual de usuario, informes oficiales, recambios), **Revisiones** (recalls) y **Fuentes** (estado de cada proveedor consultado).
+La ficha tiene 5 pestañas: **Ficha** (especificaciones por sección), **Esquemas** (esquemas eléctricos, se buscan con el VIN), **Docs** (manuales de taller, mantenimiento y aceites, boletines, manual de usuario, informes oficiales, recambios), **Recalls** y **Fuentes** (estado de cada proveedor consultado).
+
+## Esquemas eléctricos (por VIN)
+
+Se buscan **después de tener el VIN**, porque el esquema depende de la unidad exacta. Autodata y Alldata no se usan.
+
+1. **Portal oficial del fabricante** (RMI, Reglamento UE 2018/858): identifica el coche por VIN y da el esquema de esa unidad. Acceso de pago por horas o días para talleres independientes. Al abrirlo, la app copia el VIN para pegarlo.
+
+   | Marcas | Portal |
+   |---|---|
+   | VW, Audi, SEAT/CUPRA, Škoda | erWin |
+   | Peugeot, Citroën, DS, Opel (base PSA) | Service Box |
+   | Fiat, Alfa Romeo, Lancia, Abarth, Jeep | Stellantis Technical Information |
+   | Renault, Dacia | NewDialogys (acceso vía ASOS) |
+   | BMW, MINI | AOS |
+   | Mercedes-Benz, smart | B2B Connect (Dynamic Wiring Diagram por VIN) |
+   | Toyota, Lexus | Toyota-tech.eu (EWD) |
+   | Hyundai | Portal RMI para independientes |
+   | Resto | Búsqueda del portal RMI de la marca |
+
+2. **Búsquedas dirigidas** con el código de plataforma que sale del VIN (VAG posiciones 7-8, p. ej. `5F` = León III; Mercedes posiciones 4-6, p. ej. `W205`), el código de motor y el idioma original de la documentación (`Stromlaufplan`, `schéma électrique`…).
+
+Para añadir una marca: `server/src/providers/wiring.ts` → `OEM_PORTALS`.
 
 ## Fuentes de datos
 
@@ -50,8 +72,9 @@ La ficha tiene 4 pestañas: **Ficha** (especificaciones por sección), **Docs** 
 | [OCR.space](https://ocr.space/ocrapi) | Lectura de VIN (y de matrícula si no hay Plate Recognizer) | Plan gratuito | ✅ `OCRSPACE_API_KEY` |
 | [Plate Recognizer](https://platerecognizer.com) | Lector especializado de matrículas (región `es`) | Plan gratuito limitado | ✅ `PLATE_RECOGNIZER_TOKEN` |
 | [RegCheck](https://www.regcheck.org.uk) (CheckSpain) | Matrícula española → VIN, versión, K-Type… | De pago por consulta | 🔌 `REGCHECK_USERNAME` (verificar formato de respuesta al activar) |
-| HaynesPro WorkshopData | Esquemas eléctricos, procedimientos, mantenimiento | Licencia | 🔌 enchufe preparado |
-| Autodata | Esquemas, distribución, pares de apriete, códigos de avería | Licencia | 🔌 enchufe preparado |
+| Portales oficiales del fabricante | Esquemas eléctricos y manuales por VIN | Pago por horas/días | ✅ Enlace directo con el VIN copiado |
+| Castrol (buscador de productos) | Aceites y líquidos por matrícula | Gratis | ✅ Enlace con la matrícula copiada (sin integración automática: su API interna está protegida con reCAPTCHA) |
+| HaynesPro WorkshopData | Procedimientos, mantenimiento | Licencia | 🔌 enchufe preparado |
 | TecDoc (TecAlliance) | Recambios por K-Type | Licencia | 🔌 enchufe preparado |
 | Enlaces dirigidos | DGT (informe oficial), portales RMI del fabricante, Safety Gate UE, búsquedas de manuales y esquemas | Gratis | ✅ |
 
@@ -75,7 +98,7 @@ La ficha tiene 4 pestañas: **Ficha** (especificaciones por sección), **Docs** 
 
 ## Próximos pasos
 
-- Contratar proveedor matrícula→VIN (RegCheck u otro) y uno de datos de taller (HaynesPro o Autodata).
+- Contratar proveedor matrícula→VIN (RegCheck u otro).
 - OCR en el dispositivo (ML Kit) con *development build* para no depender de red al leer.
 - Visor de esquemas eléctricos dentro de la app (PDF/SVG con zoom).
 - Desplegar el servidor (Railway, Fly.io, Render…) y publicar la app con EAS.

@@ -38,7 +38,13 @@ describe('GET /api/vehicle/vin/:vin', () => {
     expect(r.summary).toMatchObject({ make: 'SEAT', model: 'Leon', year: 2019, engineCode: 'DADA' });
     expect(r.vin?.country).toBe('España');
     expect(r.specs.map((s) => s.id)).toEqual(expect.arrayContaining(['nhtsa-identificacion', 'nhtsa-motor', 'vin']));
-    expect(r.documents.some((d) => d.kind === 'esquema_electrico')).toBe(true);
+    // esquemas: portal oficial de la marca (erWin SEAT) con el VIN para copiar, y búsquedas con la plataforma 5F
+    const wiring = r.documents.filter((d) => d.kind === 'esquema_electrico');
+    expect(wiring[0]).toMatchObject({ trust: 'oficial', copyValue: 'VSSZZZ5FZKR123456' });
+    expect(wiring[0].url).toContain('erwin.seat.com');
+    expect(wiring.some((d) => decodeURIComponent(d.url).includes('León III 5F') && decodeURIComponent(d.url).includes('Stromlaufplan'))).toBe(true);
+    expect(wiring.some((d) => d.title.includes('DADA'))).toBe(true);
+    expect(r.summary.platform).toBe('5F (León III)');
     // recalls de EE. UU. no aplican a un VIN europeo
     expect(r.sources.find((s) => s.provider === 'nhtsa-recalls')?.status).toBe('skipped');
     // los proveedores con licencia aparecen como "no configurado"
@@ -79,6 +85,9 @@ describe('GET /api/vehicle/plate/:plate', () => {
     expect(r.plate?.display).toBe('1234 BCD');
     expect(r.sources[0].status).toBe('not_configured');
     expect(r.warnings[0]).toMatch(/escanea el VIN/);
+    // sin VIN no hay esquemas, pero sí el buscador de Castrol con la matrícula para copiar
+    expect(r.documents.some((d) => d.kind === 'esquema_electrico')).toBe(false);
+    expect(r.documents.find((d) => d.source === 'Castrol')).toMatchObject({ copyValue: '1234BCD' });
   });
 
   it('con RegCheck obtiene el VIN y encadena la búsqueda por VIN', async () => {
@@ -149,6 +158,16 @@ describe('POST /api/ocr', () => {
       body: JSON.stringify({ kind: 'vin', imageBase64: 'AAAA' }),
     });
     expect(res.status).toBe(503);
+  });
+});
+
+describe('findOemPortal', () => {
+  it('asigna el portal oficial por marca', async () => {
+    const { findOemPortal } = await import('./providers/wiring');
+    expect(findOemPortal('Renault')?.portals[0].url).toContain('newdialogys');
+    expect(findOemPortal('Mercedes-Benz')?.portals[0].url).toContain('b2bconnect');
+    expect(findOemPortal('CITROËN')?.group).toBe('Stellantis (PSA)');
+    expect(findOemPortal('Ferrari')).toBeUndefined();
   });
 });
 

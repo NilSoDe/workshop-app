@@ -38,6 +38,13 @@ describe('VIN', () => {
     expect(decodeVinLocal('1M8GDM9AXKP042788').modelYearCandidates).toEqual([1989]);
   });
 
+  it('extrae el código de plataforma (VAG y Mercedes)', () => {
+    expect(decodeVinLocal('VSSZZZ5FZKR123456').platform).toMatchObject({ code: '5F', label: 'León III', scheme: 'VAG' });
+    expect(decodeVinLocal('WVWZZZ1KZ8W123456').platform?.label).toBe('Golf V / Jetta');
+    expect(decodeVinLocal('WDD2050421F123456').platform).toMatchObject({ searchTerm: 'W205', scheme: 'Mercedes-Benz' });
+    expect(decodeVinLocal('VF1RFB00X12345678').platform).toBeUndefined();
+  });
+
   it('rechaza longitudes incorrectas', () => {
     const info = decodeVinLocal('WVWZZZ1JZ');
     expect(info.valid).toBe(false);

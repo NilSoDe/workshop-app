@@ -16,6 +16,7 @@ import {
 import { nhtsaDecode, nhtsaRecalls } from './providers/nhtsa';
 import { buildDocumentLinks } from './providers/links';
 import { regcheckConfigured, regcheckLookup, type PlateLookupResult } from './providers/regcheck';
+import { buildWiringSources } from './providers/wiring';
 import { workshopProviders } from './providers/workshop';
 import { env, HttpError, runSource, TtlCache } from './util';
 
@@ -45,7 +46,9 @@ export async function lookupByVin(rawVin: string, fromPlate?: { plate: string; d
   if (fromPlate) sources.push(fromPlate.source);
 
   const localSummary: VehicleSummary = {
-    make: vinInfo.manufacturer,
+    make: vinInfo.manufacturer?.split(' / ')[0],
+    model: vinInfo.platform?.label,
+    platform: vinInfo.platform ? vinInfo.platform.searchTerm + (vinInfo.platform.label ? ` (${vinInfo.platform.label})` : '') : undefined,
     year: vinInfo.modelYearCandidates.length === 1 ? vinInfo.modelYearCandidates[0] : undefined,
   };
 
@@ -95,6 +98,7 @@ export async function lookupByVin(rawVin: string, fromPlate?: { plate: string; d
 
   const documents: VehicleDocument[] = [
     ...workshop.flatMap((w) => w.data?.documents ?? []),
+    ...buildWiringSources({ vin: vinInfo, summary: baseSummary }),
     ...buildDocumentLinks({ summary: baseSummary, vin: vinInfo.vin, plate: fromPlate?.plate, northAmerican }),
   ];
 
@@ -132,6 +136,9 @@ function vinSection(v: ReturnType<typeof decodeVinLocal>): SpecSection {
     v.manufacturer ? { label: 'Fabricante (WMI)', value: v.manufacturer } : null,
     v.modelYearCandidates.length
       ? { label: 'Año modelo (pos. 10)', value: v.modelYearCandidates.join(' o ') + (v.checkDigitRequired ? '' : ' (orientativo en UE)') }
+      : null,
+    v.platform
+      ? { label: `Plataforma (${v.platform.scheme})`, value: v.platform.searchTerm + (v.platform.label ? ` · ${v.platform.label}` : '') }
       : null,
     { label: 'Código de planta', value: v.plantCode },
     { label: 'Nº de serie', value: v.serialNumber },

@@ -54,6 +54,10 @@ export interface VehicleDocument {
   /** "oficial" = fuente del fabricante/administración; "licencia" = proveedor de pago; "busqueda" = enlace de búsqueda */
   trust: 'oficial' | 'licencia' | 'busqueda';
   note?: string;
+  /** Valor que la app copia al portapapeles antes de abrir (VIN o matrícula) para pegarlo en el portal */
+  copyValue?: string;
+  /** Orden dentro de su grupo (menor = más arriba) */
+  priority?: number;
 }
 
 export interface VehicleSummary {
@@ -69,6 +73,8 @@ export interface VehicleSummary {
   /** TecDoc K-Type: clave para enlazar con catálogos de recambios y datos de taller */
   ktype?: string;
   firstRegistration?: string;
+  /** Código de plataforma/serie del fabricante (p. ej. "5F", "W205") */
+  platform?: string;
 }
 
 export interface VehicleReport {
