@@ -1,0 +1,17 @@
+{
+  "name": "workshop-app",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Identifica un vehículo por foto de matrícula o VIN y reúne toda su información técnica.",
+  "workspaces": [
+    "app",
+    "server",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:server": "npm run dev -w server",
+    "dev:app": "npm run start -w app",
+    "test": "npm test -w @workshop/core && npm test -w server",
+    "typecheck": "npm run typecheck -w @workshop/core && npm run typecheck -w server && npm run typecheck -w app"
+  }
+}
