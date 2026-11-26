@@ -10,6 +10,7 @@ import { Badge, Button, Card, Notice, Row, SectionTitle } from '@/components/ui'
 import { Fonts, MaxContentWidth, Radius, Spacing, type ThemeColor } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { api, ApiError } from '@/lib/api';
+import { componentEs } from '@/lib/nhtsa-es';
 import { addToHistory } from '@/lib/storage';
 
 type Tab = 'ficha' | 'esquemas' | 'docs' | 'revisiones' | 'fuentes';
@@ -152,7 +153,7 @@ export default function VehicleScreen() {
             ['ficha', 'Ficha'],
             ['esquemas', 'Esquemas'],
             ['docs', 'Docs'],
-            ['revisiones', `Recalls${report.recalls.length ? ` (${report.recalls.length})` : ''}`],
+            ['revisiones', `Avisos${report.recalls.length ? ` (${report.recalls.length})` : ''}`],
             ['fuentes', 'Fuentes'],
           ] as [Tab, string][]
         ).map(([id, label]) => (
@@ -173,31 +174,7 @@ export default function VehicleScreen() {
 
       {tab === 'docs' && <DocumentsTab docs={report.documents.filter((d) => d.kind !== 'esquema_electrico')} />}
 
-      {tab === 'revisiones' &&
-        (report.recalls.length ? (
-          report.recalls.map((r) => (
-            <Card key={r.id}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: Spacing.two }}>
-                <ThemedText type="smallBold" style={{ flex: 1 }}>
-                  {r.component ?? 'Campaña'}
-                </ThemedText>
-                <Badge label={r.id} />
-              </View>
-              {r.date && <ThemedText type="small" themeColor="textSecondary">{r.date} · {r.source}</ThemedText>}
-              <ThemedText type="small">{r.summary}</ThemedText>
-              {r.consequence && <ThemedText type="small" themeColor="textSecondary">Riesgo: {r.consequence}</ThemedText>}
-              {r.remedy && <ThemedText type="small" themeColor="textSecondary">Solución: {r.remedy}</ThemedText>}
-            </Card>
-          ))
-        ) : (
-          <Notice
-            tone="success"
-            text={
-              report.sources.find((x) => x.provider === 'nhtsa-recalls')?.message ??
-              'No hay llamadas a revisión registradas en las fuentes consultadas.'
-            }
-          />
-        ))}
+      {tab === 'revisiones' && <AlertsTab report={report} />}
 
       {tab === 'fuentes' && (
         <Card>
@@ -254,6 +231,94 @@ function SpecCard({ section }: { section: SpecSection }) {
       </Pressable>
       {open && section.items.map((i, idx) => <Row key={`${i.label}-${idx}`} label={i.label} value={i.value} mono={i.label === 'VIN'} />)}
     </Card>
+  );
+}
+
+function AlertsTab({ report }: { report: VehicleReport }) {
+  const t = useTheme();
+  const c = report.complaints;
+  const max = c?.byComponent[0]?.count ?? 1;
+  return (
+    <View style={{ gap: Spacing.two }}>
+      <SectionTitle>Llamadas a revisión</SectionTitle>
+      {report.recalls.length ? (
+        report.recalls.map((r) => (
+          <Card key={r.id}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: Spacing.two }}>
+              <ThemedText type="smallBold" style={{ flex: 1 }}>
+                {r.component ? componentEs(r.component) : 'Campaña'}
+              </ThemedText>
+              <Badge label={r.id} />
+            </View>
+            {r.date && <ThemedText type="small" themeColor="textSecondary">{r.date} · {r.source}</ThemedText>}
+            <ThemedText type="small">{r.summary}</ThemedText>
+            {r.consequence && <ThemedText type="small" themeColor="textSecondary">Riesgo: {r.consequence}</ThemedText>}
+            {r.remedy && <ThemedText type="small" themeColor="textSecondary">Solución: {r.remedy}</ThemedText>}
+          </Card>
+        ))
+      ) : (
+        <Notice
+          tone="success"
+          text={
+            report.sources.find((x) => x.provider === 'nhtsa-recalls')?.message ??
+            'No hay llamadas a revisión registradas en las fuentes consultadas.'
+          }
+        />
+      )}
+
+      <SectionTitle right={c ? <Badge label={`${c.total} quejas`} /> : undefined}>Averías reportadas</SectionTitle>
+      {!c ? (
+        <Notice
+          text={
+            report.sources.find((x) => x.provider === 'nhtsa-complaints')?.message ??
+            'Sin datos de quejas para este vehículo.'
+          }
+        />
+      ) : (
+        <>
+          {c.note && <Notice text={c.note} />}
+          <Card>
+            <ThemedText type="small" themeColor="textSecondary">
+              Componentes con más quejas
+            </ThemedText>
+            {c.byComponent.map((b) => (
+              <View key={b.component} style={{ gap: 4 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: Spacing.two }}>
+                  <ThemedText type="small" style={{ flex: 1 }}>
+                    {componentEs(b.component)}
+                  </ThemedText>
+                  <ThemedText type="smallBold">{b.count}</ThemedText>
+                </View>
+                <View style={[styles.barTrack, { backgroundColor: t.backgroundSelected }]}>
+                  <View style={[styles.barFill, { width: `${(b.count / max) * 100}%`, backgroundColor: t.accent }]} />
+                </View>
+              </View>
+            ))}
+          </Card>
+          <SectionTitle>Últimas quejas</SectionTitle>
+          {c.recent.map((q) => (
+            <Card key={q.id}>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.one }}>
+                {q.components.map((comp) => (
+                  <Badge key={comp} label={componentEs(comp)} />
+                ))}
+                {q.fire && <Badge label="Incendio" color="danger" />}
+                {q.crash && <Badge label="Accidente" color="danger" />}
+              </View>
+              <ThemedText type="small" numberOfLines={6}>
+                {q.summary}
+              </ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                {q.date} · ODI {q.id}
+              </ThemedText>
+            </Card>
+          ))}
+          <ThemedText type="small" themeColor="textSecondary">
+            Fuente: {c.source}. Los textos son de los propios usuarios (en inglés).
+          </ThemedText>
+        </>
+      )}
+    </View>
   );
 }
 
@@ -354,6 +419,8 @@ const styles = StyleSheet.create({
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
   segment: { flexDirection: 'row', borderRadius: Radius.md, padding: 3 },
   segmentItem: { flex: 1, alignItems: 'center', paddingVertical: Spacing.two, borderRadius: Radius.md - 3 },
+  barTrack: { height: 6, borderRadius: 3, overflow: 'hidden' },
+  barFill: { height: 6, borderRadius: 3 },
   sourceRow: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -3,7 +3,7 @@
  * norteamericano; para VIN europeos suele devolver al menos fabricante y, a veces, modelo/motor.
  * https://vpic.nhtsa.dot.gov/api/
  */
-import type { Recall, SpecSection, VehicleSummary } from '@workshop/core';
+import type { ComplaintsSummary, Recall, SpecSection, VehicleSummary } from '@workshop/core';
 import { fetchJson } from '../util';
 
 type VpicRow = Record<string, string | null>;
@@ -153,4 +153,57 @@ export async function nhtsaRecalls(make: string, model: string, year: number): P
     remedy: r.Remedy,
     source: 'NHTSA (EE. UU.)',
   }));
+}
+
+interface NhtsaComplaintRow {
+  odiNumber: number;
+  dateOfIncident?: string;
+  dateComplaintFiled?: string;
+  components?: string;
+  summary?: string;
+  crash?: boolean;
+  fire?: boolean;
+  numberOfInjuries?: number;
+}
+
+/** "10/23/2026" → "2026-10-23" (para ordenar y mostrar) */
+function isoDate(d?: string): string | undefined {
+  const m = d?.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  return m ? `${m[3]}-${m[1]}-${m[2]}` : d;
+}
+
+/** Quejas de usuarios (EE. UU.) por marca/modelo/año, agregadas por componente. */
+export async function nhtsaComplaints(make: string, model: string, year: number, recentLimit = 8): Promise<ComplaintsSummary> {
+  const q = new URLSearchParams({ make, model, modelYear: String(year) });
+  const data = await fetchJson<{ count?: number; results?: NhtsaComplaintRow[] }>(
+    `https://api.nhtsa.gov/complaints/complaintsByVehicle?${q}`,
+  );
+  const rows = data.results ?? [];
+  const counts = new Map<string, number>();
+  for (const r of rows) {
+    for (const c of (r.components ?? 'UNKNOWN OR OTHER').split(',').map((x) => x.trim()).filter(Boolean)) {
+      counts.set(c, (counts.get(c) ?? 0) + 1);
+    }
+  }
+  const recent = rows
+    .map((r) => ({
+      id: String(r.odiNumber),
+      date: isoDate(r.dateComplaintFiled ?? r.dateOfIncident),
+      components: (r.components ?? '').split(',').map((x) => x.trim()).filter(Boolean),
+      summary: (r.summary ?? '').trim(),
+      crash: !!r.crash,
+      fire: !!r.fire,
+      injuries: r.numberOfInjuries ?? 0,
+    }))
+    .sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''))
+    .slice(0, recentLimit);
+  return {
+    total: data.count ?? rows.length,
+    byComponent: [...counts.entries()]
+      .map(([component, count]) => ({ component, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10),
+    recent,
+    source: 'NHTSA (quejas de usuarios en EE. UU.)',
+  };
 }

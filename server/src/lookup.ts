@@ -13,7 +13,7 @@ import {
   type VehicleReport,
   type VehicleSummary,
 } from '@workshop/core';
-import { nhtsaDecode, nhtsaRecalls } from './providers/nhtsa';
+import { nhtsaComplaints, nhtsaDecode, nhtsaRecalls } from './providers/nhtsa';
 import { buildDocumentLinks } from './providers/links';
 import { regcheckConfigured, regcheckLookup, type PlateLookupResult } from './providers/regcheck';
 import { buildWiringSources } from './providers/wiring';
@@ -89,6 +89,27 @@ export async function lookupByVin(rawVin: string, fromPlate?: { plate: string; d
     });
   }
 
+  // Quejas: datos de EE. UU., útiles como "averías típicas" si el modelo también se vende allí.
+  let complaints: VehicleReport['complaints'];
+  if (baseSummary.make && baseSummary.model && baseSummary.year) {
+    const c = await runSource('nhtsa-complaints', 'Quejas de usuarios (NHTSA)', async () => {
+      const r = await nhtsaComplaints(baseSummary.make!, baseSummary.model!, baseSummary.year!);
+      return r.total ? { status: 'ok' as const, data: r } : { status: 'empty' as const, message: 'Sin quejas registradas para este modelo/año' };
+    });
+    sources.push(c.source);
+    complaints = c.data && {
+      ...c.data,
+      note: northAmerican ? undefined : 'Datos del mercado de EE. UU.: orientativos si el mismo modelo se vende allí.',
+    };
+  } else {
+    sources.push({
+      provider: 'nhtsa-complaints',
+      label: 'Quejas de usuarios (NHTSA)',
+      status: 'skipped',
+      message: 'Hace falta marca, modelo y año.',
+    });
+  }
+
   const specs: SpecSection[] = [
     ...(fromPlate?.data.specs ?? []),
     ...workshop.flatMap((w) => w.data?.specs ?? []),
@@ -116,6 +137,7 @@ export async function lookupByVin(rawVin: string, fromPlate?: { plate: string; d
     plate: fromPlate ? parseSpanishPlate(fromPlate.plate) : undefined,
     specs,
     recalls,
+    complaints,
     documents,
     sources,
     warnings,

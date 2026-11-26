@@ -36,6 +36,26 @@ export interface Recall {
   source: string;
 }
 
+export interface Complaint {
+  id: string;
+  date?: string;
+  components: string[];
+  summary: string;
+  crash: boolean;
+  fire: boolean;
+  injuries: number;
+}
+
+export interface ComplaintsSummary {
+  total: number;
+  /** Componentes con más quejas, de mayor a menor */
+  byComponent: Array<{ component: string; count: number }>;
+  /** Las más recientes */
+  recent: Complaint[];
+  source: string;
+  note?: string;
+}
+
 export type DocumentKind =
   | 'manual_taller'
   | 'esquema_electrico'
@@ -85,6 +105,7 @@ export interface VehicleReport {
   plate?: PlateInfo;
   specs: SpecSection[];
   recalls: Recall[];
+  complaints?: ComplaintsSummary;
   documents: VehicleDocument[];
   sources: SourceResult[];
   warnings: string[];

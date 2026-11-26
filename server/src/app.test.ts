@@ -55,11 +55,26 @@ describe('GET /api/vehicle/vin/:vin', () => {
     mockFetch([
       [/vpic\.nhtsa/, () => vpicRow({ Make: 'FORD', Model: 'Focus', ModelYear: '2014' })],
       [/recallsByVehicle/, () => ({ results: [{ NHTSACampaignNumber: '14V123000', Summary: 'Fallo X', Component: 'AIR BAGS' }] })],
+      [
+        /complaintsByVehicle/,
+        () => ({
+          count: 3,
+          results: [
+            { odiNumber: 1, dateComplaintFiled: '01/05/2020', components: 'POWER TRAIN', summary: 'tirones', crash: false, fire: false },
+            { odiNumber: 2, dateComplaintFiled: '10/23/2026', components: 'POWER TRAIN, ELECTRICAL SYSTEM', summary: 'no arranca', crash: false, fire: true },
+            { odiNumber: 3, dateComplaintFiled: '03/01/2022', components: 'ELECTRICAL SYSTEM', summary: 'testigo', crash: true, fire: false },
+          ],
+        }),
+      ],
     ]);
     const res = await app.request('/api/vehicle/vin/1M8GDM9AXKP042788');
     const r = (await res.json()) as VehicleReport;
     expect(r.recalls).toHaveLength(1);
     expect(r.recalls[0].id).toBe('14V123000');
+    expect(r.complaints?.total).toBe(3);
+    expect(r.complaints?.byComponent[0]).toEqual({ component: 'POWER TRAIN', count: 2 });
+    expect(r.complaints?.recent[0]).toMatchObject({ id: '2', date: '2026-10-23', fire: true });
+    expect(r.complaints?.note).toBeUndefined();
   });
 
   it('sigue respondiendo si NHTSA falla', async () => {
