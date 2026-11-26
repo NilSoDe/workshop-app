@@ -50,6 +50,9 @@ describe('GET /api/vehicle/vin/:vin', () => {
     expect(rescue[0]).toMatchObject({ trust: 'oficial' });
     expect(rescue[0].url).toContain('seat.de');
     expect(rescue).toHaveLength(2);
+    // manual del propietario: portal oficial SEAT + búsqueda en su web
+    const manuals = r.documents.filter((d) => d.kind === 'manual_usuario');
+    expect(manuals[0]).toMatchObject({ trust: 'oficial', url: 'https://www.seat.com/owners/about-my-car/manuals' });
     // recalls de EE. UU. no aplican a un VIN europeo
     expect(r.sources.find((s) => s.provider === 'nhtsa-recalls')?.status).toBe('skipped');
     // los proveedores con licencia aparecen como "no configurado"
@@ -188,6 +191,16 @@ describe('findOemPortal', () => {
     expect(findOemPortal('Mercedes-Benz')?.portals[0].url).toContain('b2bconnect');
     expect(findOemPortal('CITROËN')?.group).toBe('Stellantis (PSA)');
     expect(findOemPortal('Ferrari')).toBeUndefined();
+  });
+});
+
+describe('buildOwnerManuals', () => {
+  it('VW copia el VIN; Toyota busca solo en toyota.es', async () => {
+    const { buildOwnerManuals } = await import('./providers/manuals');
+    expect(buildOwnerManuals({ make: 'Volkswagen', vin: 'WVWZZZ1KZ8W123456' })[0].copyValue).toBe('WVWZZZ1KZ8W123456');
+    const toyota = buildOwnerManuals({ make: 'Toyota', model: 'Corolla', year: 2020 });
+    expect(toyota).toHaveLength(1);
+    expect(decodeURIComponent(toyota[0].url)).toContain('site:toyota.es Corolla 2020');
   });
 });
 

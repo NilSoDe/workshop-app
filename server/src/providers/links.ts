@@ -3,6 +3,7 @@
  * (manuales de taller, esquemas eléctricos, manual de usuario, boletines, recambios).
  */
 import type { VehicleDocument, VehicleSummary } from '@workshop/core';
+import { buildOwnerManuals } from './manuals';
 import { buildRescueSheets } from './rescue';
 
 const google = (q: string) => `https://www.google.com/search?q=${encodeURIComponent(q)}`;
@@ -48,6 +49,7 @@ export function buildDocumentLinks(opts: {
   }
 
   docs.push(...buildRescueSheets(summary.make, summary.model));
+  docs.push(...buildOwnerManuals({ make: summary.make, model: summary.model, year: summary.year, vin }));
 
   const base = [summary.make, summary.model].filter(Boolean).join(' ');
   if (!base) return docs;
@@ -59,13 +61,6 @@ export function buildDocumentLinks(opts: {
       title: `Manual de taller — ${withEngine}`,
       kind: 'manual_taller',
       url: google(`${withEngine} manual de taller pdf`),
-      source: 'Búsqueda web',
-      trust: 'busqueda',
-    },
-    {
-      title: `Manual del propietario — ${withYear}`,
-      kind: 'manual_usuario',
-      url: google(`${withYear} manual del propietario pdf`),
       source: 'Búsqueda web',
       trust: 'busqueda',
     },
