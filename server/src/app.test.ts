@@ -22,6 +22,7 @@ function mockFetch(routes: Array<[RegExp, (url: string, init?: RequestInit) => u
 }
 
 beforeEach(() => {
+  process.env.AUTH_DISABLED = '1';
   reportCache.clear();
   for (const k of ['OCRSPACE_API_KEY', 'PLATE_RECOGNIZER_TOKEN', 'REGCHECK_USERNAME']) delete process.env[k];
 });

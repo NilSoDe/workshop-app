@@ -12,6 +12,7 @@ const PDF = new TextEncoder().encode('%PDF-1.4\n% prueba\n%%EOF');
 beforeAll(async () => {
   dir = await mkdtemp(path.join(tmpdir(), 'lib-'));
   process.env.LIBRARY_DIR = dir;
+  process.env.AUTH_DISABLED = '1';
 });
 afterAll(async () => {
   await rm(dir, { recursive: true, force: true });

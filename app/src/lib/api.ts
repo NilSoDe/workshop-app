@@ -1,6 +1,7 @@
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import type { LibraryItem, OcrResponse, ProviderStatus, VehicleReport } from '@workshop/core';
+import { clearSession, getToken, type Session } from './session';
 import { getApiUrlOverride } from './storage';
 
 const API_PORT = 8787;
@@ -37,7 +38,10 @@ async function request<T>(path: string, init?: RequestInit, timeoutMs = 30_000):
   const url = `${getApiUrl()}${path}`;
   let res: Response;
   try {
-    res = await fetch(url, { ...init, signal: ctrl.signal });
+    const token = getToken();
+    const headers = new Headers(init?.headers);
+    if (token && !headers.has('authorization')) headers.set('authorization', `Bearer ${token}`);
+    res = await fetch(url, { ...init, headers, signal: ctrl.signal });
   } catch (e) {
     const aborted = e instanceof Error && e.name === 'AbortError';
     throw new ApiError(
@@ -49,16 +53,35 @@ async function request<T>(path: string, init?: RequestInit, timeoutMs = 30_000):
     clearTimeout(t);
   }
   const body = (await res.json().catch(() => ({}))) as { error?: string };
+  if (res.status === 401 && getToken() && !path.startsWith('/api/auth/login')) {
+    await clearSession(); // sesión caducada: vuelve a la pantalla de login
+  }
   if (!res.ok) throw new ApiError(body.error ?? `Error ${res.status}`, res.status);
   return body as T;
 }
 
 /** Las URLs relativas (PDFs de la biblioteca) apuntan al propio servidor. */
 export function resolveUrl(url: string): string {
-  return url.startsWith('/') ? `${getApiUrl()}${url}` : url;
+  if (!url.startsWith('/')) return url;
+  // Los PDFs se abren en el navegador, que no puede mandar cabeceras: el token va en la URL.
+  const token = getToken();
+  const sep = url.includes('?') ? '&' : '?';
+  return `${getApiUrl()}${url}${token ? `${sep}token=${encodeURIComponent(token)}` : ''}`;
 }
 
 export const api = {
+  login: (email: string, password: string) =>
+    request<Session>('/api/auth/login', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    }),
+  register: (email: string, password: string, name?: string) =>
+    request<Session>('/api/auth/register', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email, password, name }),
+    }),
   byVin: (vin: string) => request<VehicleReport>(`/api/vehicle/vin/${encodeURIComponent(vin)}`),
   byPlate: (plate: string) => request<VehicleReport>(`/api/vehicle/plate/${encodeURIComponent(plate)}`),
   providers: () => request<ProviderStatus[]>('/api/providers', undefined, 8_000),

@@ -3,6 +3,7 @@ import { bodyLimit } from 'hono/body-limit';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { detectQuery } from '@workshop/core';
+import { login, register, requireAuth } from './auth';
 import { addToLibrary, libraryFile, MAX_PDF_BYTES, matchLibrary, readIndex, removeFromLibrary } from './library';
 import { lookupByPlate, lookupByVin, providerStatuses } from './lookup';
 import { runOcr } from './providers/ocr';
@@ -20,6 +21,47 @@ app.onError((err, c) => {
 });
 
 app.get('/health', (c) => c.json({ ok: true }));
+
+// --- Autenticación (rutas públicas; el resto de /api exige sesión) ----------
+
+/** Freno básico a la fuerza bruta: 10 intentos fallidos por email o IP cada 15 min. */
+const attempts = new Map<string, { n: number; until: number }>();
+function throttle(key: string, failed?: boolean) {
+  const now = Date.now();
+  const a = attempts.get(key);
+  if (a && a.until < now) attempts.delete(key);
+  const cur = attempts.get(key);
+  if (!failed) {
+    if (cur && cur.n >= 10) throw new HttpError(429, 'Demasiados intentos. Prueba de nuevo en unos minutos.');
+    return;
+  }
+  attempts.set(key, { n: (cur?.n ?? 0) + 1, until: cur?.until ?? now + 15 * 60_000 });
+}
+const clientIp = (c: { req: { header: (n: string) => string | undefined } }) =>
+  c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ?? 'local';
+
+app.post('/api/auth/register', async (c) => {
+  const body = await c.req.json<{ email?: string; password?: string; name?: string }>().catch(() => ({}));
+  return c.json(await register(body), 201);
+});
+
+app.post('/api/auth/login', async (c) => {
+  const body = await c.req.json<{ email?: string; password?: string }>().catch(() => ({}) as { email?: string });
+  const keys = [`ip:${clientIp(c)}`, `email:${(body.email ?? '').toLowerCase()}`];
+  keys.forEach((k) => throttle(k));
+  try {
+    const r = await login(body);
+    keys.forEach((k) => attempts.delete(k));
+    return c.json(r);
+  } catch (e) {
+    if (e instanceof HttpError && e.status === 401) keys.forEach((k) => throttle(k, true));
+    throw e;
+  }
+});
+
+app.use('/api/*', requireAuth);
+
+app.get('/api/auth/me', (c) => c.json({ user: c.get('user' as never) ?? null }));
 
 app.get('/api/providers', (c) => c.json(providerStatuses()));
 

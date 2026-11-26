@@ -9,6 +9,7 @@ import { Badge, Button, Card, Notice, SectionTitle, TabTopInset } from '@/compon
 import { Fonts, MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { api, getApiUrl } from '@/lib/api';
+import { clearSession, useSession } from '@/lib/session';
 import { getApiUrlOverride, setApiUrlOverride } from '@/lib/storage';
 
 const KIND_LABEL: Record<ProviderStatus['kind'], string> = {
@@ -21,6 +22,7 @@ const KIND_LABEL: Record<ProviderStatus['kind'], string> = {
 
 export default function SettingsScreen() {
   const t = useTheme();
+  const session = useSession();
   const [url, setUrl] = useState(getApiUrlOverride() ?? '');
   const [status, setStatus] = useState<{ ok: boolean; msg: string } | null>(null);
   const [providers, setProviders] = useState<ProviderStatus[] | null>(null);
@@ -55,6 +57,15 @@ export default function SettingsScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: t.background }} edges={['top']}>
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         <ThemedText type="subtitle">Ajustes</ThemedText>
+
+        <Card>
+          <ThemedText type="smallBold">Cuenta</ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            {session?.user.name ? `${session.user.name} · ` : ''}
+            {session?.user.email}
+          </ThemedText>
+          <Button title="Cerrar sesión" variant="secondary" onPress={() => clearSession()} />
+        </Card>
 
         <Card>
           <ThemedText type="smallBold">Servidor API</ThemedText>
