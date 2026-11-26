@@ -45,6 +45,11 @@ describe('GET /api/vehicle/vin/:vin', () => {
     expect(wiring.some((d) => decodeURIComponent(d.url).includes('León III 5F') && decodeURIComponent(d.url).includes('Stromlaufplan'))).toBe(true);
     expect(wiring.some((d) => d.title.includes('DADA'))).toBe(true);
     expect(r.summary.platform).toBe('5F (León III)');
+    // ficha de rescate oficial de SEAT + Euro Rescue
+    const rescue = r.documents.filter((d) => d.kind === 'ficha_rescate');
+    expect(rescue[0]).toMatchObject({ trust: 'oficial' });
+    expect(rescue[0].url).toContain('seat.de');
+    expect(rescue).toHaveLength(2);
     // recalls de EE. UU. no aplican a un VIN europeo
     expect(r.sources.find((s) => s.provider === 'nhtsa-recalls')?.status).toBe('skipped');
     // los proveedores con licencia aparecen como "no configurado"

@@ -23,6 +23,7 @@ const KIND_LABEL: Record<DocumentKind, string> = {
   manual_usuario: 'Manual del propietario',
   informe_oficial: 'Informes oficiales',
   recambios: 'Recambios',
+  ficha_rescate: 'Fichas de rescate',
   otro: 'Otros',
 };
 const KIND_ORDER: DocumentKind[] = [
@@ -30,6 +31,7 @@ const KIND_ORDER: DocumentKind[] = [
   'mantenimiento',
   'boletin_tecnico',
   'manual_usuario',
+  'ficha_rescate',
   'informe_oficial',
   'recambios',
   'otro',

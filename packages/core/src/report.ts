@@ -64,6 +64,7 @@ export type DocumentKind =
   | 'boletin_tecnico'
   | 'informe_oficial'
   | 'recambios'
+  | 'ficha_rescate'
   | 'otro';
 
 export interface VehicleDocument {
