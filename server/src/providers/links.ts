@@ -3,6 +3,7 @@
  * (manuales de taller, esquemas eléctricos, manual de usuario, boletines, recambios).
  */
 import type { VehicleDocument, VehicleSummary } from '@workshop/core';
+import { buildMaintenanceSources } from './maintenance';
 import { buildOwnerManuals } from './manuals';
 import { buildRescueSheets } from './rescue';
 
@@ -50,6 +51,7 @@ export function buildDocumentLinks(opts: {
 
   docs.push(...buildRescueSheets(summary.make, summary.model));
   docs.push(...buildOwnerManuals({ make: summary.make, model: summary.model, year: summary.year, vin }));
+  docs.push(...buildMaintenanceSources(summary.make, vin));
 
   const base = [summary.make, summary.model].filter(Boolean).join(' ');
   if (!base) return docs;

@@ -53,6 +53,11 @@ describe('GET /api/vehicle/vin/:vin', () => {
     // manual del propietario: portal oficial SEAT + búsqueda en su web
     const manuals = r.documents.filter((d) => d.kind === 'manual_usuario');
     expect(manuals[0]).toMatchObject({ trust: 'oficial', url: 'https://www.seat.com/owners/about-my-car/manuals' });
+    // mantenimiento gratuito de erWin con el VIN
+    expect(r.documents.find((d) => d.source === 'erWin SEAT / CUPRA')).toMatchObject({
+      kind: 'mantenimiento',
+      copyValue: 'VSSZZZ5FZKR123456',
+    });
     // recalls de EE. UU. no aplican a un VIN europeo
     expect(r.sources.find((s) => s.provider === 'nhtsa-recalls')?.status).toBe('skipped');
     // los proveedores con licencia aparecen como "no configurado"
