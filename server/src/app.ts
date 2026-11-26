@@ -3,6 +3,7 @@ import { bodyLimit } from 'hono/body-limit';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { detectQuery } from '@workshop/core';
+import { addToLibrary, libraryFile, MAX_PDF_BYTES, matchLibrary, readIndex, removeFromLibrary } from './library';
 import { lookupByPlate, lookupByVin, providerStatuses } from './lookup';
 import { runOcr } from './providers/ocr';
 import { HttpError } from './util';
@@ -44,3 +45,47 @@ app.post(
     return c.json(await runOcr(body.kind, body.imageBase64, body.mime));
   },
 );
+
+// --- Biblioteca de PDFs propios -------------------------------------------
+
+app.get('/api/library', async (c) => {
+  const { vin, make, model } = c.req.query();
+  return c.json(vin || make ? await matchLibrary({ vin, make, model }) : await readIndex());
+});
+
+app.post(
+  '/api/library',
+  bodyLimit({ maxSize: MAX_PDF_BYTES + 1024 * 1024, onError: (c) => c.json({ error: 'El PDF supera 50 MB' }, 413) }),
+  async (c) => {
+    const body = await c.req.parseBody();
+    const file = body.file;
+    if (!(file instanceof File)) throw new HttpError(400, 'Falta el archivo (campo "file")');
+    const str = (k: string) => (typeof body[k] === 'string' ? (body[k] as string) : undefined);
+    const item = await addToLibrary({
+      bytes: new Uint8Array(await file.arrayBuffer()),
+      filename: file.name || 'documento.pdf',
+      title: str('title'),
+      kind: str('kind'),
+      scope: str('scope'),
+      vin: str('vin'),
+      make: str('make'),
+      model: str('model'),
+    });
+    return c.json(item, 201);
+  },
+);
+
+app.get('/api/library/:id/file', async (c) => {
+  const { bytes, item } = await libraryFile(c.req.param('id'));
+  const safeName = item.filename.replace(/[^\w.\- ]+/g, '_');
+  return c.body(new Uint8Array(bytes), 200, {
+    'content-type': 'application/pdf',
+    'content-disposition': `inline; filename="${safeName}"`,
+    'cache-control': 'private, max-age=3600',
+  });
+});
+
+app.delete('/api/library/:id', async (c) => {
+  await removeFromLibrary(c.req.param('id'));
+  return c.json({ ok: true });
+});

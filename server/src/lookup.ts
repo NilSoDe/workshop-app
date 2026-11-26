@@ -18,6 +18,7 @@ import { buildDocumentLinks } from './providers/links';
 import { regcheckConfigured, regcheckLookup, type PlateLookupResult } from './providers/regcheck';
 import { buildWiringSources } from './providers/wiring';
 import { workshopProviders } from './providers/workshop';
+import { libraryToDocuments, matchLibrary } from './library';
 import { env, HttpError, runSource, TtlCache } from './util';
 
 export const reportCache = new TtlCache<VehicleReport>(24 * 60 * 60 * 1000);
@@ -32,7 +33,7 @@ function mergeSummary(...layers: Array<VehicleSummary | undefined>): VehicleSumm
   return out;
 }
 
-export async function lookupByVin(rawVin: string, fromPlate?: { plate: string; data: PlateLookupResult; source: SourceResult }): Promise<VehicleReport> {
+async function reportByVin(rawVin: string, fromPlate?: { plate: string; data: PlateLookupResult; source: SourceResult }): Promise<VehicleReport> {
   const vinInfo = decodeVinLocal(rawVin);
   if (!vinInfo.vin || vinInfo.vin.length !== 17 || !/^[A-HJ-NPR-Z0-9]{17}$/.test(vinInfo.vin)) {
     throw new HttpError(400, vinInfo.warnings[0] ?? 'VIN no válido');
@@ -169,7 +170,7 @@ function vinSection(v: ReturnType<typeof decodeVinLocal>): SpecSection {
   return { id: 'vin', title: 'Desglose del VIN', items, source: 'Decodificación local (ISO 3779)' };
 }
 
-export async function lookupByPlate(rawPlate: string): Promise<VehicleReport> {
+async function reportByPlate(rawPlate: string): Promise<VehicleReport> {
   const plate = parseSpanishPlate(rawPlate);
   if (!plate.valid) throw new HttpError(400, `"${rawPlate}" no parece una matrícula española válida`);
   const cacheKey = `plate:${plate.normalized}`;
@@ -185,7 +186,7 @@ export async function lookupByPlate(rawPlate: string): Promise<VehicleReport> {
   });
 
   if (res.data?.vin) {
-    const report = await lookupByVin(res.data.vin, { plate: plate.normalized, data: res.data, source: res.source });
+    const report = await reportByVin(res.data.vin, { plate: plate.normalized, data: res.data, source: res.source });
     reportCache.set(cacheKey, report);
     return report;
   }
@@ -249,4 +250,19 @@ export function providerStatuses(): ProviderStatus[] {
       description: p.description,
     })),
   ];
+}
+
+/** Añade los PDFs propios que aplican (siempre al momento: no se cachean). */
+async function withLibrary(report: VehicleReport): Promise<VehicleReport> {
+  const items = await matchLibrary({ vin: report.query.vin, make: report.summary.make, model: report.summary.model });
+  if (!items.length) return report;
+  return { ...report, documents: [...libraryToDocuments(items), ...report.documents] };
+}
+
+export async function lookupByVin(vin: string): Promise<VehicleReport> {
+  return withLibrary(await reportByVin(vin));
+}
+
+export async function lookupByPlate(plate: string): Promise<VehicleReport> {
+  return withLibrary(await reportByPlate(plate));
 }

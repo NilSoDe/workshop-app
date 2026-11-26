@@ -62,6 +62,19 @@ Se buscan **después de tener el VIN**, porque el esquema depende de la unidad e
 
 Para añadir una marca: `server/src/providers/wiring.ts` → `OEM_PORTALS`.
 
+## Biblioteca de PDFs propios
+
+Desde **Esquemas** o **Docs** → "Añadir PDF". Guardas los manuales y esquemas que ya tengas (por ejemplo, los que descargues en una hora pagada del portal oficial) y los vinculas a:
+
+| Vínculo | Aparece en |
+|---|---|
+| Este VIN | Solo ese coche |
+| Plataforma (p. ej. `5F`) | Todos los coches de esa plataforma |
+| Modelo | Todos los de esa marca y modelo |
+| Marca | Todos los de esa marca |
+
+Los PDFs se guardan en el servidor (`server/data/library`, configurable con `LIBRARY_DIR`), máx. 50 MB cada uno. Mantén pulsado un PDF para borrarlo. ⚠️ El servidor no tiene usuarios: no lo expongas a internet sin añadir autenticación.
+
 ## Fuentes de datos
 
 | Fuente | Qué da | Coste | Estado |
@@ -69,6 +82,11 @@ Para añadir una marca: `server/src/providers/wiring.ts` → `OEM_PORTALS`.
 | Decodificador local (ISO 3779) | País, fabricante (WMI), año modelo, planta, nº serie, dígito de control | Gratis | ✅ Funciona sin red |
 | [NHTSA vPIC](https://vpic.nhtsa.dot.gov/api/) | Marca, modelo, motor, transmisión, seguridad… (completo en vehículos de EE. UU., parcial en europeos) | Gratis, sin clave | ✅ |
 | NHTSA Recalls | Llamadas a revisión (solo mercado EE. UU.) | Gratis | ✅ |
+| NHTSA Complaints | Quejas de usuarios agregadas por componente ("averías típicas") | Gratis | ✅ |
+| Fichas de rescate | Página oficial de cada marca (índice ADAC) + app Euro Rescue | Gratis | ✅ |
+| Manual del propietario | Portales oficiales (VW por VIN, SEAT, Škoda, Renault, Peugeot, Citroën, Kia) y búsqueda en la web oficial del resto | Gratis | ✅ |
+| erWin Digital Service Schedule | Plan de mantenimiento e historial por VIN (VW, Audi, SEAT/CUPRA, Škoda) | Gratis para empresas | ✅ |
+| Biblioteca propia | Tus PDFs vinculados por VIN / plataforma / modelo / marca | Gratis | ✅ |
 | [OCR.space](https://ocr.space/ocrapi) | Lectura de VIN (y de matrícula si no hay Plate Recognizer) | Plan gratuito | ✅ `OCRSPACE_API_KEY` |
 | [Plate Recognizer](https://platerecognizer.com) | Lector especializado de matrículas (región `es`) | Plan gratuito limitado | ✅ `PLATE_RECOGNIZER_TOKEN` |
 | [RegCheck](https://www.regcheck.org.uk) (CheckSpain) | Matrícula española → VIN, versión, K-Type… | De pago por consulta | 🔌 `REGCHECK_USERNAME` (verificar formato de respuesta al activar) |

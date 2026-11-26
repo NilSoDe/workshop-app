@@ -1,15 +1,15 @@
 import type { DocumentKind, SourceStatus, SpecSection, VehicleDocument, VehicleReport } from '@workshop/core';
 import * as Clipboard from 'expo-clipboard';
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { ActivityIndicator, Alert, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Badge, Button, Card, Notice, Row, SectionTitle } from '@/components/ui';
 import { Fonts, MaxContentWidth, Radius, Spacing, type ThemeColor } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { api, ApiError } from '@/lib/api';
+import { api, ApiError, resolveUrl } from '@/lib/api';
 import { componentEs } from '@/lib/nhtsa-es';
 import { addToHistory } from '@/lib/storage';
 
@@ -80,16 +80,19 @@ export default function VehicleScreen() {
     setLoading(false);
   }, []);
 
-  useEffect(() => {
-    let active = true;
-    fetchReport().then(
-      (r) => active && onLoaded(r),
-      (e) => active && onFailed(e),
-    );
-    return () => {
-      active = false;
-    };
-  }, [fetchReport, onLoaded, onFailed]);
+  // Se recarga al volver a la pantalla (p. ej. tras subir un PDF a la biblioteca).
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      fetchReport().then(
+        (r) => active && onLoaded(r),
+        (e) => active && onFailed(e),
+      );
+      return () => {
+        active = false;
+      };
+    }, [fetchReport, onLoaded, onFailed]),
+  );
 
   const load = () => {
     setLoading(true);
@@ -172,9 +175,11 @@ export default function VehicleScreen() {
 
       {tab === 'ficha' && (report.specs.length ? report.specs.map((sec) => <SpecCard key={sec.id} section={sec} />) : <Notice text="Sin especificaciones disponibles." />)}
 
-      {tab === 'esquemas' && <WiringTab report={report} />}
+      {tab === 'esquemas' && <WiringTab report={report} onChanged={load} />}
 
-      {tab === 'docs' && <DocumentsTab docs={report.documents.filter((d) => d.kind !== 'esquema_electrico')} />}
+      {tab === 'docs' && (
+        <DocumentsTab report={report} docs={report.documents.filter((d) => d.kind !== 'esquema_electrico')} onChanged={load} />
+      )}
 
       {tab === 'revisiones' && <AlertsTab report={report} />}
 
@@ -326,21 +331,43 @@ function AlertsTab({ report }: { report: VehicleReport }) {
 
 async function openDocument(d: VehicleDocument) {
   if (d.copyValue) await Clipboard.setStringAsync(d.copyValue);
-  await WebBrowser.openBrowserAsync(d.url);
+  await WebBrowser.openBrowserAsync(resolveUrl(d.url));
 }
 
-function DocCard({ d }: { d: VehicleDocument }) {
+function confirmDelete(d: VehicleDocument, onDeleted: () => void) {
+  if (!d.libraryId) return;
+  const run = () => api.deletePdf(d.libraryId!).then(onDeleted, (e) => Alert.alert('No se pudo borrar', String(e?.message ?? e)));
+  if (Platform.OS === 'web') {
+    if (globalThis.confirm?.(`¿Borrar "${d.title}" de tu biblioteca?`)) run();
+    return;
+  }
+  Alert.alert('Borrar PDF', `¿Borrar "${d.title}" de tu biblioteca?`, [
+    { text: 'Cancelar', style: 'cancel' },
+    { text: 'Borrar', style: 'destructive', onPress: run },
+  ]);
+}
+
+const TRUST_BADGE: Record<VehicleDocument['trust'], { label: string; color: ThemeColor }> = {
+  propio: { label: 'Tuyo', color: 'accent' },
+  oficial: { label: 'Oficial', color: 'success' },
+  licencia: { label: 'Licencia', color: 'success' },
+  busqueda: { label: 'Búsqueda', color: 'textSecondary' },
+};
+
+function DocCard({ d, onChanged }: { d: VehicleDocument; onChanged?: () => void }) {
   return (
-    <Pressable onPress={() => openDocument(d)} accessibilityRole="link">
+    <Pressable
+      onPress={() => openDocument(d)}
+      onLongPress={d.libraryId && onChanged ? () => confirmDelete(d, onChanged) : undefined}
+      accessibilityRole="link"
+      accessibilityHint={d.libraryId ? 'Mantén pulsado para borrarlo' : undefined}>
       <Card>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: Spacing.two }}>
           <ThemedText type="smallBold" style={{ flex: 1 }}>
+            {d.libraryId ? '📄 ' : ''}
             {d.title}
           </ThemedText>
-          <Badge
-            label={d.trust === 'oficial' ? 'Oficial' : d.trust === 'licencia' ? 'Licencia' : 'Búsqueda'}
-            color={d.trust === 'busqueda' ? 'textSecondary' : 'success'}
-          />
+          <Badge label={TRUST_BADGE[d.trust].label} color={TRUST_BADGE[d.trust].color} />
         </View>
         {d.note && <ThemedText type="small" themeColor="textSecondary">{d.note}</ThemedText>}
         {d.copyValue && (
@@ -348,12 +375,41 @@ function DocCard({ d }: { d: VehicleDocument }) {
             ⧉ Copia {d.copyValue} y abre
           </ThemedText>
         )}
+        {d.libraryId && (
+          <ThemedText type="small" themeColor="textSecondary">
+            Mantén pulsado para borrarlo
+          </ThemedText>
+        )}
       </Card>
     </Pressable>
   );
 }
 
-function WiringTab({ report }: { report: VehicleReport }) {
+function openUpload(report: VehicleReport, kind: DocumentKind) {
+  router.push({
+    pathname: '/upload',
+    params: {
+      kind,
+      ...(report.query.vin ? { vin: report.query.vin } : {}),
+      ...(report.summary.make ? { make: report.summary.make } : {}),
+      ...(report.summary.model ? { model: report.summary.model } : {}),
+    },
+  });
+}
+
+function DocGroup({ title, docs, onChanged }: { title: string; docs: VehicleDocument[]; onChanged: () => void }) {
+  if (!docs.length) return null;
+  return (
+    <>
+      <SectionTitle>{title}</SectionTitle>
+      {docs.map((d) => (
+        <DocCard key={d.libraryId ?? d.url} d={d} onChanged={onChanged} />
+      ))}
+    </>
+  );
+}
+
+function WiringTab({ report, onChanged }: { report: VehicleReport; onChanged: () => void }) {
   const wiring = report.documents
     .filter((d) => d.kind === 'esquema_electrico')
     .sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99));
@@ -365,45 +421,38 @@ function WiringTab({ report }: { report: VehicleReport }) {
       </View>
     );
   }
-  const official = wiring.filter((d) => d.trust !== 'busqueda');
-  const searches = wiring.filter((d) => d.trust === 'busqueda');
   return (
     <View style={{ gap: Spacing.two }}>
-      {official.length > 0 && (
-        <>
-          <SectionTitle>Portal oficial del fabricante</SectionTitle>
-          {official.map((d) => (
-            <DocCard key={d.url} d={d} />
-          ))}
-        </>
-      )}
-      {searches.length > 0 && (
-        <>
-          <SectionTitle>Búsquedas dirigidas</SectionTitle>
-          {searches.map((d) => (
-            <DocCard key={d.url} d={d} />
-          ))}
-        </>
-      )}
+      <DocGroup title="Tus PDFs" docs={wiring.filter((d) => d.trust === 'propio')} onChanged={onChanged} />
+      <DocGroup title="Portal oficial del fabricante" docs={wiring.filter((d) => d.trust === 'oficial' || d.trust === 'licencia')} onChanged={onChanged} />
+      <DocGroup title="Búsquedas dirigidas" docs={wiring.filter((d) => d.trust === 'busqueda')} onChanged={onChanged} />
+      <Button title="＋ Añadir esquema en PDF" variant="secondary" onPress={() => openUpload(report, 'esquema_electrico')} />
     </View>
   );
 }
 
-function DocumentsTab({ docs }: { docs: VehicleDocument[] }) {
+function DocumentsTab({ report, docs, onChanged }: { report: VehicleReport; docs: VehicleDocument[]; onChanged: () => void }) {
+  const mine = docs.filter((d) => d.trust === 'propio');
+  const rest = docs.filter((d) => d.trust !== 'propio');
   return (
     <View style={{ gap: Spacing.two }}>
-      {KIND_ORDER.filter((k) => docs.some((d) => d.kind === k)).map((kind) => (
+      <DocGroup title="Tus PDFs" docs={mine} onChanged={onChanged} />
+      {KIND_ORDER.filter((k) => rest.some((d) => d.kind === k)).map((kind) => (
         <View key={kind}>
           <SectionTitle>{KIND_LABEL[kind]}</SectionTitle>
           <View style={{ gap: Spacing.two }}>
-            {docs
+            {rest
               .filter((d) => d.kind === kind)
+              .sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99))
               .map((d) => (
                 <DocCard key={d.url} d={d} />
               ))}
           </View>
         </View>
       ))}
+      {(report.query.vin || report.summary.make) && (
+        <Button title="＋ Añadir PDF a la biblioteca" variant="secondary" onPress={() => openUpload(report, 'manual_taller')} />
+      )}
     </View>
   );
 }

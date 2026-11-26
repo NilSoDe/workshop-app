@@ -73,12 +73,32 @@ export interface VehicleDocument {
   url: string;
   source: string;
   /** "oficial" = fuente del fabricante/administración; "licencia" = proveedor de pago; "busqueda" = enlace de búsqueda */
-  trust: 'oficial' | 'licencia' | 'busqueda';
+  trust: 'oficial' | 'licencia' | 'busqueda' | 'propio';
   note?: string;
   /** Valor que la app copia al portapapeles antes de abrir (VIN o matrícula) para pegarlo en el portal */
   copyValue?: string;
   /** Orden dentro de su grupo (menor = más arriba) */
   priority?: number;
+  /** Si es un PDF de la biblioteca propia: su id (para borrarlo) y a qué está vinculado */
+  libraryId?: string;
+  libraryScope?: LibraryScope;
+}
+
+export type LibraryScope = 'vin' | 'platform' | 'model' | 'make';
+
+export interface LibraryItem {
+  id: string;
+  title: string;
+  kind: DocumentKind;
+  scope: LibraryScope;
+  vin?: string;
+  /** p. ej. "VAG:5F" */
+  platformKey?: string;
+  make?: string;
+  model?: string;
+  filename: string;
+  size: number;
+  uploadedAt: string;
 }
 
 export interface VehicleSummary {

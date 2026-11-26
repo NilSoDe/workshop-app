@@ -1,6 +1,6 @@
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
-import type { OcrResponse, ProviderStatus, VehicleReport } from '@workshop/core';
+import type { LibraryItem, OcrResponse, ProviderStatus, VehicleReport } from '@workshop/core';
 import { getApiUrlOverride } from './storage';
 
 const API_PORT = 8787;
@@ -53,11 +53,19 @@ async function request<T>(path: string, init?: RequestInit, timeoutMs = 30_000):
   return body as T;
 }
 
+/** Las URLs relativas (PDFs de la biblioteca) apuntan al propio servidor. */
+export function resolveUrl(url: string): string {
+  return url.startsWith('/') ? `${getApiUrl()}${url}` : url;
+}
+
 export const api = {
   byVin: (vin: string) => request<VehicleReport>(`/api/vehicle/vin/${encodeURIComponent(vin)}`),
   byPlate: (plate: string) => request<VehicleReport>(`/api/vehicle/plate/${encodeURIComponent(plate)}`),
   providers: () => request<ProviderStatus[]>('/api/providers', undefined, 8_000),
   health: () => request<{ ok: boolean }>('/health', undefined, 5_000),
+  uploadPdf: (form: FormData) =>
+    request<LibraryItem>('/api/library', { method: 'POST', body: form }, 120_000),
+  deletePdf: (id: string) => request<{ ok: boolean }>(`/api/library/${id}`, { method: 'DELETE' }),
   ocr: (kind: 'plate' | 'vin', imageBase64: string) =>
     request<OcrResponse>(
       '/api/ocr',
