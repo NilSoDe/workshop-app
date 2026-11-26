@@ -24,7 +24,8 @@ export function buildDocumentLinks(opts: {
     url: 'https://sede.dgt.gob.es/es/vehiculos/informe-de-vehiculo/',
     source: 'DGT',
     trust: 'oficial',
-    note: `Titularidad, cargas, ITV, kilometraje. De pago, con ${plate ? 'la matrícula' : 'matrícula o bastidor'}.`,
+    note: `Titularidad, cargas, ITV, kilometraje e historial del libro electrónico de mantenimiento (reparaciones anotadas por talleres adscritos). De pago, con ${plate ? 'la matrícula' : 'matrícula o bastidor'}.${plate ? ' La matrícula se copia al abrir.' : ''}`,
+    copyValue: plate,
   });
 
   docs.push({
@@ -48,6 +49,15 @@ export function buildDocumentLinks(opts: {
       trust: 'oficial',
     });
   }
+
+  docs.push({
+    title: 'Libros técnicos gratis con tu carné de biblioteca (eBiblio)',
+    kind: 'otro',
+    url: 'https://ebiblio.es/',
+    source: 'Bibliotecas públicas de España',
+    trust: 'oficial',
+    note: 'Préstamo digital gratuito: electricidad y electrónica del automóvil, motores, diagnosis. No son manuales de un modelo concreto.',
+  });
 
   docs.push(...buildRescueSheets(summary.make, summary.model));
   docs.push(...buildOwnerManuals({ make: summary.make, model: summary.model, year: summary.year, vin }));

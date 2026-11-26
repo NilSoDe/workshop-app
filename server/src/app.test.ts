@@ -116,6 +116,8 @@ describe('GET /api/vehicle/plate/:plate', () => {
     // sin VIN no hay esquemas, pero sí el buscador de Castrol con la matrícula para copiar
     expect(r.documents.some((d) => d.kind === 'esquema_electrico')).toBe(false);
     expect(r.documents.find((d) => d.source === 'Castrol')).toMatchObject({ copyValue: '1234BCD' });
+    expect(r.documents.find((d) => d.source === 'DGT')).toMatchObject({ copyValue: '1234BCD' });
+    expect(r.documents.some((d) => d.url === 'https://ebiblio.es/')).toBe(true);
   });
 
   it('con RegCheck obtiene el VIN y encadena la búsqueda por VIN', async () => {

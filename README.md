@@ -87,6 +87,8 @@ Los PDFs se guardan en el servidor (`server/data/library`, configurable con `LIB
 | Manual del propietario | Portales oficiales (VW por VIN, SEAT, Škoda, Renault, Peugeot, Citroën, Kia) y búsqueda en la web oficial del resto | Gratis | ✅ |
 | erWin Digital Service Schedule | Plan de mantenimiento e historial por VIN (VW, Audi, SEAT/CUPRA, Škoda) | Gratis para empresas | ✅ |
 | Biblioteca propia | Tus PDFs vinculados por VIN / plataforma / modelo / marca | Gratis | ✅ |
+| eBiblio (bibliotecas públicas) | Préstamo digital de libros técnicos de automoción con carné de biblioteca | Gratis | ✅ Enlace (no son manuales por modelo) |
+| DGT — libro electrónico de mantenimiento | Reparaciones anotadas por talleres adscritos; sale en el Informe del Vehículo | De pago (informe) | ✅ Enlace con la matrícula copiada |
 | [OCR.space](https://ocr.space/ocrapi) | Lectura de VIN (y de matrícula si no hay Plate Recognizer) | Plan gratuito | ✅ `OCRSPACE_API_KEY` |
 | [Plate Recognizer](https://platerecognizer.com) | Lector especializado de matrículas (región `es`) | Plan gratuito limitado | ✅ `PLATE_RECOGNIZER_TOKEN` |
 | [RegCheck](https://www.regcheck.org.uk) (CheckSpain) | Matrícula española → VIN, versión, K-Type… | De pago por consulta | 🔌 `REGCHECK_USERNAME` (verificar formato de respuesta al activar) |
